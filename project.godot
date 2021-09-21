@@ -132,6 +132,8 @@ _global_script_class_icons={
 "TrackingBackend": "",
 "TrackingData": "",
 "SignalBroadcaster": "",
+"TrackingBackend": "",
+"TrackingData": "",
 "TranslationManager": "",
 "VRMMappings": "",
 "VRMModel": "",
