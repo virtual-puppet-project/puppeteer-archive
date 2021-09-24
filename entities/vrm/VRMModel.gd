@@ -252,17 +252,19 @@ func set_expression_weight(expression_name: String, expression_weight: float) ->
 		for blend_name in vrm_mappings[expression_name].expression_data[mesh_name]:
 			_modify_blend_shape(mapped_meshes[mesh_name], blend_name, expression_weight)
 
-func custom_update(data, interpolation_data) -> void:
+func custom_update(data: TrackingData, interpolation_data) -> void:
 	# NOTE: Eye mappings are intentionally reversed so that the model mirrors the data
 	if not eco_mode:
 		# Left eye blinking
-		if data.left_eye_open >= blink_threshold:
+		if data.get_left_eye_open_amount() >= blink_threshold:
+			# _modify_blend_shape(blink_r.morphs[0].mesh, blink_r.morphs[0].morph, blink_r.morphs[0].values[1] - data.left_eye_open)
 			_modify_blend_shape(blink_r.morphs[0].mesh, blink_r.morphs[0].morph, blink_r.morphs[0].values[1] - interpolation_data.interpolate(InterpolationData.InterpolationDataType.LEFT_EYE_BLINK, 1.0))
 		else:
 			_modify_blend_shape(blink_r.morphs[0].mesh, blink_r.morphs[0].morph, blink_r.morphs[0].values[1])
 
 		# Right eye blinking
-		if data.right_eye_open >= blink_threshold:
+		if data.get_right_eye_open_amount() >= blink_threshold:
+			# _modify_blend_shape(blink_l.morphs[0].mesh, blink_l.morphs[0].morph, blink_l.morphs[0].values[1] - data.right_eye_open)
 			_modify_blend_shape(blink_l.morphs[0].mesh, blink_l.morphs[0].morph, blink_l.morphs[0].values[1] - interpolation_data.interpolate(InterpolationData.InterpolationDataType.RIGHT_EYE_BLINK, 1.0))
 		else:
 			_modify_blend_shape(blink_l.morphs[0].mesh, blink_l.morphs[0].morph, blink_l.morphs[0].values[1])
@@ -316,7 +318,7 @@ func custom_update(data, interpolation_data) -> void:
 	else:
 		# TODO implement eco mode, should be more efficient than standard mode
 		# Eco-mode blinking
-		if(data.left_eye_open < blink_threshold and data.right_eye_open < blink_threshold):
+		if(data.get_left_eye_open_amount() < blink_threshold and data.get_right_eye_open_amount() < blink_threshold):
 			pass
 		else:
 			pass
