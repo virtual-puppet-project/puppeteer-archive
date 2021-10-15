@@ -95,6 +95,8 @@ func _process(delta: float) -> void:
 func _on_tree_exiting() -> void:
 	if tracking_backend.is_listening():
 		tracking_backend.stop_receiver()
+
+	cm.save_config()
 	
 	log_message("Exiting. おやすみ。")
 
