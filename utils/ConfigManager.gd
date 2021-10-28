@@ -1,3 +1,4 @@
+class_name ConfigManager
 extends Reference
 
 const DEMO_MODEL_PATH: String = "res://entities/basic-models/Duck.tscn"
@@ -29,6 +30,10 @@ class Metadata:
 	# Model file name to config name
 	var model_defaults: Dictionary = {} # String: String
 
+	# Not stored as an int since we can guarantee that this value
+	# will always come as a String
+	var camera_index: String = "0"
+
 	func load_from_json(json_string: String) -> bool:
 		var json_data = parse_json(json_string)
 
@@ -36,28 +41,21 @@ class Metadata:
 			AppManager.log_message("Invalid metadata loaded, using default metadata values", true)
 			return false
 		
-		default_model_to_load_path = json_data["default_model_to_load_path"]
-		default_search_path = json_data["default_search_path"]
-		should_use_portable_config_files = json_data["should_use_portable_config_files"]
-		config_data = json_data["config_data"]
-		model_defaults = json_data["model_defaults"]
-		use_transparent_background = json_data["use_transparent_background"]
-		use_fxaa = json_data["use_fxaa"]
-		msaa_value = json_data["msaa_value"]
+		for key in (json_data as Dictionary).keys():
+			var data = json_data[key]
+
+			set(key, data)
 
 		return true
 	
 	func get_as_json() -> String:
-		return to_json({
-			"default_model_to_load_path": default_model_to_load_path,
-			"default_search_path": default_search_path,
-			"should_use_portable_config_files": should_use_portable_config_files,
-			"config_data": config_data,
-			"model_defaults": model_defaults,
-			"use_transparent_background": use_transparent_background,
-			"use_fxaa": use_fxaa,
-			"msaa_value": msaa_value
-		})
+		var result: Dictionary = {}
+		for i in get_property_list():
+			if i.name in ["Reference", "script", "Script Variables"]:
+				continue
+			result[i.name] = get(i.name)
+
+		return to_json(result)
 	
 	func apply_rendering_changes(viewport: Viewport) -> void:
 		viewport.transparent_bg = use_transparent_background
@@ -107,6 +105,8 @@ class ConfigData:
 
 	var should_track_eye: bool = true
 	var gaze_strength: float = 0.5
+
+	var blink_threshold: float = 0.2
 
 	var tracker_fps: int = 12
 
@@ -262,9 +262,101 @@ func _init() -> void:
 	else:
 		metadata_path = "res://export"
 
+	# Model
+
+	AppManager.sb.connect("set_model_as_default", self, "_on_set_model_as_default")
+
+	# Tracking
+
+	AppManager.sb.connect("translation_damp", self, "_on_translation_damp")
+	AppManager.sb.connect("rotation_damp", self, "_on_rotation_damp")
+	AppManager.sb.connect("additional_bone_damp", self, "_on_additional_bone_damp")
+
+	AppManager.sb.connect("head_bone", self, "_on_head_bone")
+
+	AppManager.sb.connect("apply_translation", self, "_on_apply_translation")
+	AppManager.sb.connect("apply_rotation", self, "_on_apply_rotation")
+
+	AppManager.sb.connect("interpolate_model", self, "_on_interpolate_model")
+	AppManager.sb.connect("interpolation_rate", self, "_on_interpolation_rate")
+
+	AppManager.sb.connect("should_track_eye", self, "_on_should_track_eye")
+	AppManager.sb.connect("gaze_strength", self, "_on_gaze_strength")
+
+	AppManager.sb.connect("camera_select", self, "_on_camera_select")
+
+	# Features
+
+	AppManager.sb.connect("main_light", self, "_on_main_light")
+	AppManager.sb.connect("world_environment", self, "_on_environment")
+
+	# Presets
+
+	# App settings
+
+	AppManager.sb.connect("default_search_path", self, "_on_default_search_path")
+
 ###############################################################################
 # Connections                                                                 #
 ###############################################################################
+
+# Model
+
+func _on_set_model_as_default() -> void:
+	metadata_config.default_model_to_load_path = current_model_config.model_path
+
+# Tracking
+
+func _on_translation_damp(value: float) -> void:
+	current_model_config.translation_damp = value
+
+func _on_rotation_damp(value: float) -> void:
+	current_model_config.rotation_damp = value
+
+func _on_additional_bone_damp(value: float) -> void:
+	current_model_config.additional_bone_damp = value
+
+func _on_head_bone(value: String) -> void:
+	current_model_config.head_bone = value
+
+func _on_apply_translation(value: bool) -> void:
+	current_model_config.apply_translation = value
+
+func _on_apply_rotation(value: bool) -> void:
+	current_model_config.apply_rotation = value
+
+func _on_interpolate_model(value: bool) -> void:
+	current_model_config.interpolate_model = value
+
+func _on_interpolation_rate(value: float) -> void:
+	current_model_config.interpolation_rate = value
+
+func _on_should_track_eye(value: float) -> void:
+	current_model_config.should_track_eye = value
+
+func _on_gaze_strength(value: float) -> void:
+	current_model_config.gaze_strength = value
+
+func _on_blink_threshold(value: float) -> void:
+	current_model_config.blink_threshold = value
+
+func _on_camera_select(camera_index: String) -> void:
+	metadata_config.camera_index = camera_index
+
+# Features
+
+func _on_main_light(prop_name: String, value) -> void:
+	current_model_config.main_light[prop_name] = value
+
+func _on_environment(prop_name: String, value) -> void:
+	current_model_config.world_environment[prop_name] = value
+
+# Presets
+
+# App settings
+
+func _on_default_search_path(value: String) -> void:
+	metadata_config.default_search_path = value
 
 ###############################################################################
 # Private functions                                                           #
@@ -275,13 +367,9 @@ func _load_metadata() -> bool:
 
 	var file_path = "%s/%s" % [metadata_path, METADATA_NAME]
 
-	var dir := Directory.new()
-	if not dir.file_exists(file_path):
-		AppManager.log_message("%s does not exist" % file_path)
-		return false
-
 	var metadata_file := File.new()
-	metadata_file.open(file_path, File.READ)
+	if metadata_file.open(file_path, File.READ) != OK:
+		return false
 
 	if not metadata_config.load_from_json(metadata_file.get_as_text()):
 		AppManager.log_message("Failed to load metadata file")
@@ -358,7 +446,7 @@ func load_config_for_preset(preset_name: String) -> ConfigData:
 
 func load_config_and_set_as_current(model_path: String) -> void:
 	var model_name: String = model_path.get_file().get_basename()
-	var config_name: String = ""
+	var config_name: String = model_name
 	if metadata_config.model_defaults.has(model_name):
 		config_name = metadata_config.model_defaults[model_name]
 	var full_path: String = CONFIG_FORMAT % [metadata_path, config_name]
@@ -367,8 +455,19 @@ func load_config_and_set_as_current(model_path: String) -> void:
 
 	current_model_config = ConfigData.new()
 
-	var dir := Directory.new()
-	if not dir.file_exists(full_path):
+	# var dir := Directory.new()
+	# if not dir.file_exists(full_path):
+	# 	AppManager.log_message("%s does not exist" % full_path)
+	# 	current_model_config.config_name = model_name
+	# 	current_model_config.model_name = model_name
+	# 	current_model_config.model_path = model_path
+	# 	current_model_config.is_default_for_model = true # We can assume there are no defaults
+	# 	save_config(current_model_config)
+	# 	AppManager.sb.broadcast_new_preset(model_name)
+	# 	return
+
+	var config_file := File.new()
+	if not config_file.open(full_path, File.READ) == OK:
 		AppManager.log_message("%s does not exist" % full_path)
 		current_model_config.config_name = model_name
 		current_model_config.model_name = model_name
@@ -377,9 +476,6 @@ func load_config_and_set_as_current(model_path: String) -> void:
 		save_config(current_model_config)
 		AppManager.sb.broadcast_new_preset(model_name)
 		return
-
-	var config_file := File.new()
-	config_file.open(full_path, File.READ)
 	current_model_config.load_from_json(config_file.get_as_text())
 	config_file.close()
 
@@ -393,8 +489,17 @@ func save_config(p_config: ConfigData = null) -> void:
 		config = p_config.duplicate()
 	else:
 		# TODO this is gross
-		current_model_config.model_transform = AppManager.main.model_display_screen.model.transform
-		current_model_config.model_parent_transform = AppManager.main.model_display_screen.model_parent.transform
+		var model = AppManager.main.model_display_screen.model
+		var model_parent = AppManager.main.model_display_screen.model_parent
+		current_model_config.model_transform = model.transform
+		current_model_config.model_parent_transform = model_parent.transform
+
+		for bone_index in model.skeleton.get_bone_count() - 1:
+			var bone_transform: Transform = model.skeleton.get_bone_pose(bone_index)
+			var bone_name: String = model.skeleton.get_bone_name(bone_index)
+
+			current_model_config.bone_transforms[bone_name] = bone_transform
+
 		config = current_model_config.duplicate()
 
 	var config_name = config.config_name

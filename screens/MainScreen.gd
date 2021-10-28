@@ -27,6 +27,9 @@ func _ready() -> void:
 	
 	AppManager.sb.connect("file_to_load_changed", self, "_on_file_to_load_changed")
 
+	AppManager.sb.connect("main_light", self, "_on_main_light")
+	AppManager.sb.connect("world_environment", self, "_on_environment")
+
 	# TODO accommodate config manager changes, this is gross
 	while not AppManager.cm.has_loaded_metadata:
 		yield(get_tree(), "idle_frame")
@@ -49,6 +52,12 @@ func _on_file_to_load_changed(file_path: String) -> void:
 	
 	_clean_load_model_display_screen(file_path)
 
+func _on_main_light(prop_name: String, value) -> void:
+	main_light.get_child(0).set(prop_name, value)
+
+func _on_environment(prop_name: String, value) -> void:
+	world_environment.environment.set(prop_name, value)
+
 ###############################################################################
 # Private functions                                                           #
 ###############################################################################
@@ -62,6 +71,13 @@ func _clean_load_model_display_screen(path: String) -> void:
 	model_display_screen = MODEL_SCREEN.instance()
 	model_display_screen.model_resource_path = path
 	add_child(model_display_screen)
+	
+	# Set initial values from config
+	for key in AppManager.cm.current_model_config.main_light.keys():
+		main_light.get_child(0).set(key, AppManager.cm.current_model_config.main_light[key])
+	
+	for key in AppManager.cm.current_model_config.world_environment.keys():
+		world_environment.set(key, AppManager.cm.current_model_config.world_environment[key])
 
 ###############################################################################
 # Public functions                                                            #

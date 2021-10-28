@@ -1,3 +1,4 @@
+class_name SignalBroadcaster
 extends Reference
 
 signal update_label_text(element_name, value)
@@ -83,6 +84,14 @@ signal gaze_strength(value)
 func broadcast_gaze_strength(value: float) -> void:
 	emit_signal("gaze_strength", value)
 
+signal blink_threshold(value)
+func broadcast_blink_threshold(value: float) -> void:
+	emit_signal("blink_threshold", value)
+
+signal camera_select(value)
+func broadcast_camera_select(value: String) -> void:
+	emit_signal("camera_select", value)
+
 signal tracker_fps(value)
 func broadcast_tracker_fps(value: int) -> void:
 	emit_signal("tracker_fps", value)
@@ -90,6 +99,11 @@ func broadcast_tracker_fps(value: int) -> void:
 signal start_tracker()
 func broadcast_start_tracker() -> void:
 	emit_signal("start_tracker")
+
+# TODO started in Tracking.gd, to VRMModel, this isn't great
+signal blend_shapes(value)
+func broadcast_blend_shapes(value: String) -> void:
+	emit_signal("blend_shapes", value)
 
 # Features gui
 
@@ -199,6 +213,10 @@ func broadcast_use_fxaa(value: bool) -> void:
 signal msaa_value(value)
 func broadcast_msaa_value(value: bool) -> void:
 	emit_signal("msaa_value", value)
+
+signal reconstruct_views()
+func broadcast_reconstruct_views() -> void:
+	emit_signal("reconstruct_views")
 
 # File select popup
 

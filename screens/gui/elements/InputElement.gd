@@ -63,7 +63,7 @@ func _emit_event(text: String) -> void:
 				result = int(text)
 			_:
 				return
-	emit_signal("event", [event_name, result])
+	_handle_event([event_name, result])
 
 ###############################################################################
 # Public functions                                                            #
